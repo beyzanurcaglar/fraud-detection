@@ -1,0 +1,14 @@
+# Dataset (~490 MB, too large for GitHub) - download separately into data/
+data/*.csv
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
