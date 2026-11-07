@@ -1,38 +1,37 @@
-# 🛡️ Fraud Detection in Mobile-Money Transactions
+# Fraud Detection in Mobile-Money Transactions
 
-A machine-learning project that detects fraudulent financial transactions among **6.3 million** mobile-money
-transfers, served through an interactive **Streamlit** web app.
+A machine learning project that detects fraudulent transactions in a dataset of 6.3 million mobile-money
+transfers, with a Streamlit web app for making predictions.
 
-The project started from a YouTube tutorial and was then **extended and improved**: domain-driven feature
-engineering, a gradient-boosted model, validation-based threshold tuning and a time-based robustness check
-raised the **fraud precision from 0.02 to 0.94** while also slightly increasing recall.
+I started this project by following a YouTube tutorial and then extended it. With new features, an XGBoost
+model and a tuned decision threshold, precision on the fraud class went from 0.02 to 0.94, and recall went
+up slightly as well. I also checked the model for overfitting and tested it on a time-based split.
 
 ![Model comparison](images/model_comparison.png)
 
----
+## Results
 
-## 📌 Results at a glance
+Both models are evaluated on the same test set used in the tutorial (30% stratified split, `random_state=42`,
+1.9M transactions, 2,464 of them fraud).
 
-Evaluated on the **same held-out test set** as the tutorial (30%, stratified, `random_state=42`; 1.9M transactions, 2,464 frauds):
+| Metric (fraud class)                       | Tutorial (Logistic Regression) | This project (XGBoost + new features) |
+| ------------------------------------------ | -----------------------------: | ------------------------------------: |
+| Precision                                  |                          0.022 |                             **0.944** |
+| Recall                                     |                          0.939 |                             **0.951** |
+| F1-score                                   |                          0.044 |                             **0.948** |
+| PR-AUC (average precision)                 |                           0.55 |                              **0.99** |
+| False alarms (legitimate flagged as fraud) |                        101,499 |                               **138** |
+| Frauds missed                              |                            151 |                               **121** |
+| Accuracy                                   |                          94.7% |                                99.99% |
 
-| Metric (fraud class)                       | Tutorial baseline<br>Logistic Regression | **This project**<br>XGBoost + engineered features |
-| ------------------------------------------ | ---------------------------------------: | ------------------------------------------------: |
-| Precision                                  |                                    0.022 |                                         **0.944** |
-| Recall                                     |                                    0.939 |                                         **0.951** |
-| F1-score                                   |                                    0.044 |                                         **0.948** |
-| PR-AUC (average precision)                 |                                     0.55 |                                          **0.99** |
-| False alarms (legitimate flagged as fraud) |                                  101,499 |                                           **138** |
-| Frauds missed                              |                                      151 |                                           **121** |
-| Accuracy                                   |                                    94.7% |                                            99.99% |
+The new model catches slightly more fraud than the baseline while producing about 735 times fewer false alarms.
 
-👉 Same (actually better) fraud-catching power with **~735× fewer false alarms**.
+Accuracy is not a useful metric here. Only 0.13% of transactions are fraud, so a model that never predicts
+fraud would already be 99.87% accurate. That is why I focused on precision, recall, F1 and PR-AUC for the fraud class.
 
-> **Why not just accuracy?** Only 0.13% of transactions are fraud, so a model that never predicts fraud is already
-> 99.87% "accurate". This project therefore focuses on **precision, recall, F1 and PR-AUC** of the fraud class.
+### Overfitting check
 
-### Is the model overfitting?
-
-No harmful overfitting was found. The same model scores almost identically on validation and test data it has never seen:
+The model scores almost the same on the validation and test sets, which it never saw during training:
 
 | Data       | Precision |    Recall |        F1 |    PR-AUC |
 | ---------- | --------: | --------: | --------: | --------: |
@@ -40,140 +39,128 @@ No harmful overfitting was found. The same model scores almost identically on va
 | Validation |     0.946 |     0.950 |     0.948 |     0.984 |
 | **Test**   | **0.944** | **0.951** | **0.948** | **0.987** |
 
-- The small train–test gap (~4 F1 points) is normal for gradient-boosted trees.
-- **5-fold cross-validation:** F1 = 0.950 ± 0.004, so the scores are stable across different splits.
-- **Time-based split** (train on the past, test on the future): precision 0.985, recall 0.941.
+- The gap between train and test (about 4 F1 points) is small and normal for gradient-boosted trees.
+- 5-fold cross-validation gives F1 = 0.950 ± 0.004, so the result does not depend on one particular split.
+- When trained on the first 80% of the timeline and tested on the rest, the model reaches precision 0.985 and recall 0.941.
 
-The very high scores mainly come from the dataset being **synthetic** (see [Limitations](#️-limitations--next-steps)), not from overfitting.
+The scores are high mostly because the data is synthetic (see [Limitations](#limitations-and-next-steps)), not because of overfitting.
 
----
+## Why fraud detection matters
 
-## ❓ Why does this matter?
+- Fraud causes direct financial losses for banks, payment companies and their customers.
+- A model with low precision is not usable in practice. The baseline raises about 44 false alarms for every
+  real fraud, which would overload investigators and block payments from honest customers.
+- Payment systems have to decide quickly whether to approve, block or review a transaction, so the model
+  needs to be fast and easy to serve.
+- The problem covers several common ML challenges: heavy class imbalance, choosing the right metric,
+  feature engineering and picking a decision threshold.
 
-- **Financial loss:** card and payment fraud costs banks, fintechs and customers billions every year. Every missed fraud is money lost.
-- **Alert fatigue:** a model with low precision (like the baseline: ~44 false alarms per real fraud) floods
-  investigators with alerts, blocks honest customers' payments and is ignored in practice.
-- **Real-time decisions:** payment systems must decide in milliseconds whether to approve, block or review a transaction —
-  exactly what a trained pipeline + a simple app/API provides.
-- **Typical ML challenges in one project:** extreme class imbalance, choosing the right metric, feature engineering from
-  domain knowledge, threshold selection and avoiding data leakage.
+## Dataset
 
----
+|           |                                                                                                                                                                                                                       |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source    | Kaggle: [Fraud Detection Dataset](https://www.kaggle.com/datasets/amanalisiddiqui/fraud-detection-dataset) (file `AIML Dataset.csv`)                                                                                  |
+| Origin    | Synthetic mobile-money transactions generated by the PaySim simulator, based on real logs from a mobile-money service in an African country. Same structure as the original [PaySim dataset](https://www.kaggle.com/datasets/ealaxi/paysim1). |
+| Size      | 6,362,620 transactions, 11 columns (about 490 MB)                                                                                                                                                                     |
+| Target    | `isFraud`: 8,213 frauds (0.13%)                                                                                                                                                                                       |
+| Time span | 743 steps (1 step = 1 hour, about 31 days)                                                                                                                                                                            |
 
-## 📊 Dataset
+| Column                              | Description                                                        |
+| ----------------------------------- | ------------------------------------------------------------------ |
+| `step`                              | Hours since the start of the simulation                            |
+| `type`                              | `CASH_IN`, `CASH_OUT`, `DEBIT`, `PAYMENT`, `TRANSFER`              |
+| `amount`                            | Transaction amount                                                 |
+| `nameOrig` / `nameDest`             | Sender / receiver ID (not used as features)                        |
+| `oldbalanceOrg` / `newbalanceOrig`  | Sender balance before / after                                      |
+| `oldbalanceDest` / `newbalanceDest` | Receiver balance before / after                                    |
+| `isFraud`                           | Target: 1 if the transaction is fraudulent                         |
+| `isFlaggedFraud`                    | Flag from an existing rule-based system (not used, only 16 flags)  |
 
-|           |                                                                                                                                                                                                                                                                                    |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Source    | Kaggle: [Fraud Detection Dataset](https://www.kaggle.com/datasets/amanalisiddiqui/fraud-detection-dataset) (file `AIML Dataset.csv`)                                                                                                                                               |
-| Origin    | Synthetic mobile-money transactions generated by the **PaySim** simulator, based on real logs from a mobile-money service in an African country. The data has the same structure and size as the original [PaySim Kaggle dataset](https://www.kaggle.com/datasets/ealaxi/paysim1). |
-| Size      | 6,362,620 transactions × 11 columns (~490 MB)                                                                                                                                                                                                                                      |
-| Target    | `isFraud` — 8,213 frauds (**0.13%**)                                                                                                                                                                                                                                               |
-| Time span | 743 steps (1 step = 1 hour ≈ 31 days)                                                                                                                                                                                                                                              |
+The dataset is larger than GitHub's 100 MB file limit, so it is not included in this repository.
+Download it and save it as `data/AIML Dataset.csv` (see [Getting started](#getting-started)).
 
-| Column                              | Description                                                       |
-| ----------------------------------- | ----------------------------------------------------------------- |
-| `step`                              | Hour since the start of the simulation                            |
-| `type`                              | `CASH_IN`, `CASH_OUT`, `DEBIT`, `PAYMENT`, `TRANSFER`             |
-| `amount`                            | Transaction amount                                                |
-| `nameOrig` / `nameDest`             | Sender / receiver ID (not used as features)                       |
-| `oldbalanceOrg` / `newbalanceOrig`  | Sender balance before / after                                     |
-| `oldbalanceDest` / `newbalanceDest` | Receiver balance before / after                                   |
-| `isFraud`                           | **Target** — 1 if the transaction is fraudulent                   |
-| `isFlaggedFraud`                    | Flag of the existing rule-based system (not used — only 16 flags) |
+## Tech stack
 
-> ⚠️ The dataset is too large for GitHub (> 100 MB) and is **not included**. Download it and place it at
-> `data/AIML Dataset.csv` (see [Getting started](#-getting-started)).
+- Python 3.11
+- pandas, NumPy
+- Matplotlib, Seaborn
+- scikit-learn (Pipeline, ColumnTransformer, LogisticRegression, metrics)
+- XGBoost
+- joblib
+- Streamlit
+- Jupyter Notebook
 
----
+## What I did
 
-## 🧰 Tech stack
+### Part 1: Tutorial baseline ([notebooks/01_eda_and_baseline.ipynb](notebooks/01_eda_and_baseline.ipynb))
 
-| Area              | Tools                                                                                      |
-| ----------------- | ------------------------------------------------------------------------------------------ |
-| Language          | Python 3.11                                                                                |
-| Data analysis     | pandas, NumPy                                                                              |
-| Visualization     | Matplotlib, Seaborn                                                                        |
-| Machine learning  | scikit-learn (`Pipeline`, `ColumnTransformer`, `LogisticRegression`, metrics), **XGBoost** |
-| Model persistence | joblib                                                                                     |
-| Web app           | **Streamlit**                                                                              |
-| Environment       | Jupyter Notebook                                                                           |
+1. Inspected the data: shape, data types, missing values (none) and class balance (0.13% fraud).
+2. Explored the data: transaction types, fraud rate per type, amount distribution, balance changes,
+   fraud over time, top senders and receivers, correlations.
+3. Found that fraud only happens in `TRANSFER` and `CASH_OUT` transactions and usually empties the sender's account.
+4. Trained a baseline model: `StandardScaler` + `OneHotEncoder` + `LogisticRegression(class_weight="balanced")` in a scikit-learn Pipeline.
+5. Result: recall 0.94 but precision 0.02, with about 101k false alarms.
+6. Built a Streamlit app that makes predictions from user input.
 
----
+### Part 2: My improvements ([notebooks/02_improved_model.ipynb](notebooks/02_improved_model.ipynb))
 
-## 🗺️ What I did — step by step
-
-### Part 1 · Tutorial (baseline) → [`notebooks/01_eda_and_baseline.ipynb`](notebooks/01_eda_and_baseline.ipynb)
-
-1. **Data inspection** — shape, dtypes, missing values (none), class balance (0.13% fraud).
-2. **Exploratory data analysis** — transaction types, fraud rate per type, amount distribution (log scale),
-   balance changes, fraud over time, top senders/receivers, correlation heatmap.
-3. **Key finding:** fraud only happens in `TRANSFER` and `CASH_OUT`, typically emptying the sender's account.
-4. **Baseline model** — `StandardScaler` + `OneHotEncoder` + `LogisticRegression(class_weight="balanced")` in an sklearn `Pipeline`.
-5. **Result** — recall 0.94 but precision 0.02 (≈101k false alarms).
-6. **Streamlit app** to make predictions from user input.
-
-### Part 2 · My improvements → [`notebooks/02_improved_model.ipynb`](notebooks/02_improved_model.ipynb)
-
-| #   | Improvement                                                             | Why                                                                                                      |
-| --- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 1   | **Memory-efficient loading** (selected columns, `category` dtype)       | 1.5 GB → 0.3 GB in RAM                                                                                   |
-| 2   | **Domain analysis** of balances                                         | Showed that 97.8% of frauds move the sender's _entire_ balance (0.0% of legitimate TRANSFER/CASH_OUT do) |
-| 3   | **Feature engineering**: `errorBalanceOrig`, `errorBalanceDest`, `hour` | Capture ledger inconsistencies and time-of-day behaviour (the tutorial dropped `step`)                   |
-| 4   | **Train / validation / test split**                                     | Threshold is chosen on validation data, test set stays untouched; test split identical to the tutorial   |
-| 5   | **XGBoost** inside the same sklearn `Pipeline`                          | Learns non-linear rules & feature interactions; fast with `tree_method="hist"`                           |
-| 6   | **Threshold tuning**                                                    | Highest threshold that keeps recall ≥ 95% → best precision without missing more fraud than the baseline  |
-| 7   | **Fair comparison**                                                     | Baseline retrained & evaluated on the exact same test set; confusion matrices + PR curves                |
-| 8   | **Explainability**                                                      | Feature importance (gain)                                                                                |
-| 9   | **Time-based validation**                                               | Train on the first 80% of the timeline, test on the future → precision 0.985 / recall 0.941              |
-| 10  | **Overfitting check**                                                   | Train vs. validation vs. test scores + 5-fold cross-validation                                           |
-| 11  | **Refactoring**                                                         | Shared code in `src/`, reproducible training script, model + threshold saved together                    |
-| 12  | **Improved app**                                                        | Shows fraud probability, uses the tuned threshold, adds hour-of-day input                                |
+| #   | Change                                                                  | Reason                                                                                              |
+| --- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 1   | Load only needed columns, store `type` as `category`                    | Memory use drops from about 1.5 GB to 0.3 GB                                                         |
+| 2   | Analyzed sender and receiver balances                                   | 97.8% of frauds move the sender's entire balance, compared with 0.0% of legitimate TRANSFER/CASH_OUT |
+| 3   | New features: `errorBalanceOrig`, `errorBalanceDest`, `hour`            | Capture balance inconsistencies and time of day (the tutorial dropped `step`)                        |
+| 4   | Train / validation / test split                                         | The threshold is chosen on validation data; the test set is the same as in the tutorial              |
+| 5   | XGBoost inside the same scikit-learn Pipeline                           | Learns non-linear rules and feature interactions; trains quickly with `tree_method="hist"`            |
+| 6   | Threshold tuning                                                        | Highest threshold that keeps recall at 95% or above, which gives the best precision at that recall   |
+| 7   | Retrained the baseline on the same test set                             | Fair comparison with confusion matrices and precision-recall curves                                  |
+| 8   | Feature importance                                                      | Shows which features the model relies on                                                             |
+| 9   | Time-based split                                                        | Train on the first 80% of the timeline, test on the rest: precision 0.985, recall 0.941              |
+| 10  | Overfitting check                                                       | Compared train, validation and test scores and ran 5-fold cross-validation                           |
+| 11  | Moved shared code to `src/`                                             | Training and the app use the same code; the model and its threshold are saved together               |
+| 12  | Updated the app                                                         | Shows the fraud probability, uses the tuned threshold and adds an hour-of-day input                  |
 
 ### Feature engineering
 
 ```text
-errorBalanceOrig = newbalanceOrig + amount - oldbalanceOrg   # 0 when sender's books add up
-errorBalanceDest = oldbalanceDest + amount - newbalanceDest   # 0 when receiver's books add up
+errorBalanceOrig = newbalanceOrig + amount - oldbalanceOrg   # 0 when the sender's balance adds up
+errorBalanceDest = oldbalanceDest + amount - newbalanceDest   # 0 when the receiver's balance adds up
 hour             = step % 24                                  # hour of day
 ```
 
 ![Engineered features](images/engineered_features.png)
 
-Legitimate traffic almost disappears between midnight and 8 AM, while fraud stays flat — a transaction at 4 AM is far more suspicious.
+Legitimate transactions almost stop between midnight and 8 AM, while fraud happens at the same rate all day.
+A transaction at 4 AM is therefore much more likely to be fraud.
 
 ### Feature importance
 
 ![Feature importance](images/feature_importance.png)
 
----
-
-## 📁 Project structure
+## Project structure
 
 ```text
 fraud-detection/
-├── app.py                          # Streamlit web app
+├── app.py                            # Streamlit web app
 ├── data/
-│   └── AIML Dataset.csv            # dataset (not in repo, download separately)
-├── images/                         # charts used in this README
+│   └── AIML Dataset.csv              # dataset (not in the repo, download separately)
+├── images/                           # charts used in this README
 ├── models/
 │   ├── fraud_detection_pipeline.pkl  # improved model + decision threshold (used by the app)
-│   ├── baseline_logreg_pipeline.pkl  # original tutorial model
+│   ├── baseline_logreg_pipeline.pkl  # tutorial model
 │   └── metrics.json                  # test-set metrics of the improved model
 ├── notebooks/
-│   ├── 01_eda_and_baseline.ipynb   # tutorial: EDA + Logistic Regression
-│   └── 02_improved_model.ipynb     # my improvements, step by step
+│   ├── 01_eda_and_baseline.ipynb     # tutorial: EDA + Logistic Regression
+│   └── 02_improved_model.ipynb       # my improvements, step by step
 ├── src/
-│   ├── features.py                 # data loading, feature engineering, model pipeline
-│   └── train.py                    # reproducible training script
+│   ├── features.py                   # data loading, feature engineering, model pipeline
+│   └── train.py                      # training script
 ├── requirements.txt
 └── README.md
 ```
 
----
+## Getting started
 
-## 🚀 Getting started
-
-**1. Clone and install**
+1. Clone the repository and install the requirements:
 
 ```bash
 git clone https://github.com/beyzanurcaglar/fraud-detection.git
@@ -183,42 +170,39 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-**2. Get the data** — download the [Fraud Detection Dataset](https://www.kaggle.com/datasets/amanalisiddiqui/fraud-detection-dataset) from Kaggle and save it as `data/AIML Dataset.csv`.
+2. Download the [Fraud Detection Dataset](https://www.kaggle.com/datasets/amanalisiddiqui/fraud-detection-dataset) from Kaggle and save it as `data/AIML Dataset.csv`.
 
-**3. Run the app** (a trained model is already included in `models/`)
+3. Run the app (a trained model is already in `models/`):
 
 ```bash
 streamlit run app.py
 ```
 
-Try a typical fraud pattern: `TRANSFER`, amount `181`, sender balance `181 → 0`, receiver balance `0 → 0`.
+To see a typical fraud case, enter `TRANSFER`, amount `181`, sender balance `181` to `0`, receiver balance `0` to `0`.
 
-**4. (Optional) Retrain the model** — takes ~30 seconds on a laptop
+4. Optionally, retrain the model (takes about 30 seconds on a laptop):
 
 ```bash
 python -m src.train
 ```
 
-or open the notebooks with `jupyter notebook notebooks/`.
+You can also open the notebooks with `jupyter notebook notebooks/`.
 
----
+## Limitations and next steps
 
-## ⚠️ Limitations & next steps
+- The data is synthetic. PaySim's balance columns follow simple rules, which makes the balance-error
+  features unusually strong. Real data is noisier and the scores would be lower.
+- According to the dataset description, fraudulent transactions are cancelled in the simulation, so their
+  balance columns do not reflect what really happened. Both the tutorial and this project use these columns,
+  so part of the performance may come from how the simulation works rather than from real fraud patterns.
+- Fraud patterns change over time. A model used in production would need monitoring and regular retraining.
+- Possible next steps: SHAP explanations for individual predictions, hyperparameter search with
+  cross-validation, a cost-based threshold (cost of a missed fraud vs. a false alarm), and a REST API with Docker.
 
-- **Synthetic data:** PaySim is simulated. Its balance columns follow simple rules, which makes the
-  balance-error features unusually strong; real-world data is noisier and results would be lower.
-- **Balance columns:** the dataset description notes that fraudulent transactions are annulled in the simulation,
-  so their balance columns do not reflect real outcomes. Both the tutorial and this project use these columns,
-  so part of the performance may come from this simulation artifact rather than from patterns that would exist in real data.
-- **Concept drift:** fraud patterns change over time; a production system would need monitoring and periodic retraining.
-- **Possible next steps:** SHAP explanations per prediction, hyperparameter search with cross-validation,
-  cost-based threshold (cost of a missed fraud vs. a false alarm), a REST API (FastAPI) and Docker deployment.
+## References
 
----
-
-## 🙏 Acknowledgements & references
-
-- **Tutorial this project is based on:** Onur Baltacı — [_Fraud Detection Using Machine Learning – Full Python Data Science Project_](https://youtu.be/4Od5_z28iIE) (YouTube).
-  Notebook 01 and the original app follow this tutorial; everything in notebook 02, `src/` and the updated app are my own extensions.
-- **Dataset:** [Fraud Detection Dataset](https://www.kaggle.com/datasets/amanalisiddiqui/fraud-detection-dataset) (Kaggle), generated with the PaySim simulator — E. A. Lopez-Rojas, A. Elmir, S. Axelsson, _PaySim: A financial mobile money simulator for fraud detection_, EMSS 2016.
-- [scikit-learn](https://scikit-learn.org/) · [XGBoost](https://xgboost.readthedocs.io/) · [Streamlit](https://streamlit.io/)
+- Tutorial this project is based on: Onur Baltacı, [Fraud Detection Using Machine Learning – Full Python Data Science Project](https://youtu.be/4Od5_z28iIE) (YouTube).
+  Notebook 01 and the original app follow the tutorial. Notebook 02, the `src/` folder and the changes to the app are my own work.
+- Dataset: [Fraud Detection Dataset](https://www.kaggle.com/datasets/amanalisiddiqui/fraud-detection-dataset) on Kaggle, generated with PaySim.
+  E. A. Lopez-Rojas, A. Elmir, S. Axelsson, "PaySim: A financial mobile money simulator for fraud detection", EMSS 2016.
+- [scikit-learn](https://scikit-learn.org/), [XGBoost](https://xgboost.readthedocs.io/), [Streamlit](https://streamlit.io/)
